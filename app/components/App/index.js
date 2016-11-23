@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import _ from 'underscore';
 import Scroll from 'react-scroll';
+import io from 'socket.io-client/socket.io';
 import Game from '../../Game';
 
 class AppComponent extends Component {
@@ -37,24 +38,9 @@ class AppComponent extends Component {
 	}
 
 	componentDidMount() {
-		var game = new Game();
+		var game = new Game('content');
 		game.sendMessage = this.sendMessage.bind(this);
 		this.setState({game});
-
-		document.addEventListener('keydown', function(e) {
-			var msg = _.clone(this.state.msg);
-			console.log(e.key);
-			if ("abcdefghijklmnopqrstuvwxyz .,:;!?#'".indexOf(e.key.toLowerCase()) > -1) {
-				msg += e.key;
-			} else if (e.key == 'Backspace') {
-				e.preventDefault();
-				msg = msg.substring(0, msg.length - 1);
-			} else if (e.key == 'Enter') {
-
-			}
-
-			this.setState({msg});
-		}.bind(this));
 	}
 
 	render() {
