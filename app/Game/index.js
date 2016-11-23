@@ -36,8 +36,9 @@ class Game {
 			this.placeStone(data.x, data.y, data.playerID);
 		})
 
-		this.socket.on('move_error', (data) => {
-
+		this.socket.on('move_fail', (data) => {
+			console.log("move error", data);
+			this.turn = data.turn;
 		})
 
 		this.selected = null;
@@ -107,6 +108,10 @@ class Game {
 		}
 	}
 
+	isConnected(x1, y1, x2, y2) {
+		
+	}
+
 	onmouseclick() {
 		if (this.selected != null) {
 			console.log("making a move!");
@@ -167,7 +172,7 @@ class Game {
 			for (var y = 0; y < this.gridHeight; y++) {
 				if (typeof(this.grid[x][y]) !== 'undefined') {
 					var pos = this.grid[x][y].pos;
-					this.gridCanvas.fillRect(pos.x-4, pos.y-4, 8, 8, '#C2FCF7', 1);
+					this.gridCanvas.fillRect(pos.x-2, pos.y-2, 4, 4, '#D8FDF9', 1);
 				}
 			}
 		}

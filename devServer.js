@@ -63,10 +63,12 @@ io.on('connection', function(socket){
 		
 		if (typeof(grid[x][y]) !== 'undefined') {
 			if (grid[x][y] == -1) {
+				console.log(move.playerID, "moving at", x, y);
 				grid[x][y] = move.playerID;
 				turn = move.playerID == 0 ? 1 : 0;
 				socket.broadcast.emit('move', {x, y, playerID: move.playerID, turn});
 			} else {
+				console.log("Square is taken.");
 				socket.emit('move_fail', {turn, x, y, msg: 'Square is taken'});
 			}
 		} else {
