@@ -25,7 +25,7 @@ app.get('*', function(req, res) {
 var server = require('http').createServer(app);
 var io = require('socket.io')(server);
 
-var players = [];
+var players = {};
 var turn = 0;
 
 var grid = [];
@@ -41,19 +41,26 @@ var resetGrid = function(gridWidth, gridHeight) {
 		}
 	}
 }
-resetGrid(12, 12);
+resetGrid(19, 19);
 
 io.on('connection', function(socket){
 	var id = uid();
 	console.log("user " +id + " connected.");
 
 	var player = -1;
-	if (players.length < 2) {
-		player = players.length;
-		players.push({id, player});
+	if (typeof(players[0]) === 'undefined') {
+		player = 0;
+		players[0] = ({id, player});
+	} else if (typeof(players[1]) === 'undefined') {
+		player = 1;
+		players[1] = ({id, player});
+	} else {
+		player = -1;
 	}
 
-	socket.emit('login', {id, turn, player, players});
+	console.log(players[0], players[1]);
+
+	socket.emit('login', {id, turn, player, grid, players});
 	socket.broadcast.emit('create player', id);
 
 	socket.on('move', function(move){
@@ -76,11 +83,11 @@ io.on('connection', function(socket){
 		}
 	});
 	socket.on('disconnect', function(){
-		console.log('user disconnected');
+		console.log('user ' + id + ' disconnected');
 		socket.broadcast.emit('remove player', id);
-		players = _.filter(players, (p) => {
-			return p.id != id;
-		});
+		if (typeof(players[0]) !== 'undefined' && players[0].id == id) players[0] = undefined;
+		if (typeof(players[1]) !== 'undefined' && players[1].id == id) players[1] = undefined; 
+		console.log(players[0], players[1]);
 	});
 });
 server.listen(3000, function() {

@@ -26,6 +26,21 @@ class Game {
 			this.playerID = data.player;
 			this.players = data.players;
 
+			console.log(data.grid);
+
+			for (var x = 0; x < data.grid.length; x++) {
+				if (data.grid[x] != null) {
+					for (var y = 0; y < data.grid[0].length; y++) {
+						if (typeof(data.grid[x][y]) !== 'undefined') {
+							if (data.grid[x][y] > -1) {
+								console.log(data.grid[x][y]);
+								this.placeStone(x, y, data.grid[x][y]);
+							}
+						}
+					}
+				}
+			}
+
 			console.log("MY PLAYER ID IS " + this.playerID);
 		})
 
@@ -47,6 +62,8 @@ class Game {
 		document.onmouseover = this.onmousemove.bind(this);
 		document.onmousemove = this.onmousemove.bind(this);
 		document.onclick = this.onmouseclick.bind(this);
+		document.onmousedown = this.onmousedown.bind(this);
+		document.onmouseup = this.onmouseup.bind(this);
 		this.canvasIndex = 0;
 		this.backgroundCanvas = this.createCanvas('background');
 		this.gridCanvas = this.createCanvas('grid');
@@ -58,8 +75,8 @@ class Game {
 		this.columnWidth = 1;
 		this.rowHeight = 1;
 
-		this.gridWidth = 12;
-		this.gridHeight = 12;
+		this.gridWidth = 19;
+		this.gridHeight = 19;
 		this.grid = null;
 		this.resetGrid();
 	}
@@ -80,7 +97,7 @@ class Game {
 				var node = this.grid[x][y];
 				if (typeof(node) !== 'undefined') {
 					var d = node.pos.distance(gamePosition);
-					if (d < dist) {
+					if (d < dist && !node.claimed) {
 						dist = d;
 						closest = node;
 						selected_x = x;
@@ -91,7 +108,7 @@ class Game {
 
 			if (typeof(closest) !== 'undefined' && 
 				dist < (this.columnWidth * 0.45) / this.tempCanvas.scale &&
-				!closest.placed
+				!closest.claimed
 			) {
 				this.selected = closest;
 				this.tempCanvas.fillCircle(
@@ -108,8 +125,12 @@ class Game {
 		}
 	}
 
-	isConnected(x1, y1, x2, y2) {
+	onmousedown() {
 		
+	}
+
+	onmouseup() {
+
 	}
 
 	onmouseclick() {
