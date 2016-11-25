@@ -73,8 +73,19 @@ class Canvas {
 		this.ctx.fillRect(x, y, width, height);
 	}
 
-	drawLine(_x1=0, _y1=0, _x2=128, _y2=128, colour='#ffffff', alpha=1) {
+	drawLine(_x1=0, _y1=0, _x2=128, _y2=128, colour='#ffffff', alpha=1, lineWidth=8) {
+		var x1 = this.topLeft.x + _x1 * this.scale;
+		var y1 = this.topLeft.y + _y1 * this.scale;
+		var x2 = this.topLeft.x + _x2 * this.scale;
+		var y2 = this.topLeft.y + _y2 * this.scale;
 
+		this.ctx.strokeStyle = colour;
+		this.ctx.globalAlpha = alpha;
+		this.ctx.lineWidth = lineWidth * this.scale;
+		this.ctx.beginPath();
+		this.ctx.moveTo(x1,y1);
+		this.ctx.lineTo(x2,y2);
+		this.ctx.stroke();
 	}
 }
 

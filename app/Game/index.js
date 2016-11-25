@@ -4,9 +4,16 @@ import Node from './Node';
 import io from 'socket.io-client/socket.io';
 import _ from 'underscore';
 import Maths from './Maths';
+import uid from 'uid';
 
 class Game {
 	constructor(parent) {
+		this.windowFrameLooping = false;
+		this.windowFrameCallbacks = {};
+		this.windowFrameCallbackCount = 0;
+		this.windowFrameCallbackIDs = [];
+		this.connections = [];
+
 		this.parent = parent;
 		this.gamePadding = 64;
 		this.gameWidth = 1024;
@@ -41,6 +48,16 @@ class Game {
 				}
 			}
 
+			for (var i = 0; i < data.connections.length; i++) {
+				var c = data.connections[i];
+				var s0 = data.connections[i][0];
+				var s1 = data.connections[i][1];
+				this.connectStones(
+					this.grid[s0.x][s0.y],
+					this.grid[s1.x][s1.y]
+				);
+			}
+
 			console.log("MY PLAYER ID IS " + this.playerID);
 		})
 
@@ -49,6 +66,12 @@ class Game {
 			console.log(data);
 			this.turn = data.turn;
 			this.placeStone(data.x, data.y, data.playerID);
+			if (data.connected != null) {
+				this.connectStones(
+					this.grid[data.connected.x][data.connected.y], 
+					this.grid[data.x][data.y]
+				);
+			}
 		})
 
 		this.socket.on('move_fail', (data) => {
@@ -56,6 +79,7 @@ class Game {
 			this.turn = data.turn;
 		})
 
+		this.drawingLine = false;
 		this.selected = null;
 		this.canvases = [];
 		window.onresize = this.resizeCanvases.bind(this);
@@ -81,6 +105,59 @@ class Game {
 		this.resetGrid();
 	}
 
+	subscribeToWindowFrame(callback) {
+		var id = uid();
+		this.windowFrameCallbacks[id] = callback;
+		this.windowFrameCallbackIDs.push(id);
+		this.windowFrameCallbackCount++;
+		if (!this.windowFrameLooping) {
+			this.windowFrameLooping = true;
+			this.windowFrameLoop();
+		}
+
+		return id;
+	}
+
+	unsubscribeFromWindowFrame(id) {
+		this.windowFrameCallbacks[id] = undefined;
+		this.windowFrameCallbackIDs = _.filter(this.windowFrameCallbackIDs, function(_id) {
+			return _id != id;
+		});
+		this.windowFrameCallbacks--;
+		if (this.windowFrameCallbacks == 0) {
+			this.windowFrameLooping = false;
+		}
+	}
+
+	windowFrameLoop() {
+		_.each(this.windowFrameCallbackIDs, function(id) {
+			this.windowFrameCallbacks[id]();
+		}.bind(this));
+
+		window.requestAnimationFrame(this.windowFrameLoop.bind(this));
+	}
+
+	forEachNode(callback) {
+		for (var x = 0; x < this.gridWidth; x++) {
+			for (var y = 0; y < this.gridHeight; y++) {
+				var node = this.grid[x][y];
+				if (typeof(node) !== 'undefined') {
+					callback(node, x, y);
+				}
+			}
+		}
+	}
+
+	getTotalStones(playerID) {
+		var total = 0;
+		this.forEachNode(function(node, x, y) {
+			if (node.playerID == playerID) {
+				total++;
+			}
+		}.bind(this));
+		return total;
+	}
+
 	onmousemove(e) {
 		this.tempCanvas.clear();
 		var gamePosition = new Vector(e.clientX, e.clientY).minus(this.gridCanvas.topLeft).divide(this.gridCanvas.scale);
@@ -97,7 +174,7 @@ class Game {
 				var node = this.grid[x][y];
 				if (typeof(node) !== 'undefined') {
 					var d = node.pos.distance(gamePosition);
-					if (d < dist && !node.claimed) {
+					if (d < dist) {
 						dist = d;
 						closest = node;
 						selected_x = x;
@@ -107,37 +184,120 @@ class Game {
 			}
 
 			if (typeof(closest) !== 'undefined' && 
-				dist < (this.columnWidth * 0.45) / this.tempCanvas.scale &&
-				!closest.claimed
-			) {
-				this.selected = closest;
-				this.tempCanvas.fillCircle(
-					closest.pos, 
-					this.columnWidth*0.45, 
-					this.playerColours[this.playerID], 
-					1
-				);
+				dist < (this.columnWidth) / this.tempCanvas.scale) {
+				if (this.getTotalStones(this.playerID) == 0 && !closest.claimed) {
+					if (!this.drawingLine) {
+						this.selected = closest;
+						this.tempCanvas.fillCircle(
+							closest.pos, 
+							this.columnWidth*0.45, 
+							this.playerColours[this.playerID], 
+							1
+						);
+					}
+				} else if (!this.drawingLine && closest.claimed && closest.playerID == this.playerID) {
+					this.hovering = closest;
+				} else {
+					if (this.drawingLine && !closest.claimed) {
+						this.lineEnd = closest;
+						var connected = this.isConnected(this.lineEnd, this.hovering);
+						this.tempCanvas.fillCircle(
+							closest.pos, 
+							this.columnWidth*0.45, 
+							this.playerColours[this.playerID], 
+							connected ? 1 : 0.25
+						);
+						if (connected) {
+							this.tempCanvas.drawLine(
+								this.hovering.pos.x,
+								this.hovering.pos.y,
+								this.lineEnd.pos.x,
+								this.lineEnd.pos.y,
+								this.playerColours[this.playerID],
+								1
+							)
+						}
+					} else {
+						if (!this.drawingLine) {
+							this.hovering = null;
+						}
+					}
+				}
 			} else {
 				this.selected = null;
+				if (!this.drawingLine) {
+					this.hovering = null;
+				}
 			}
 		} else {
+			this.selected = null;
+			if (!this.drawingLine) {
+				this.hovering = null;
+			}
+		}
+	}
+
+	isConnected(p1, p2) {
+		var x = Math.abs(p1.pos.x - p2.pos.x);
+		var y = Math.abs(p1.pos.y - p2.pos.y);
+
+		return (Math.abs(x * 2 - y) < 1 || p1.y == p2.y);
+	}
+   
+	onmousedown() {
+		if (this.getTotalStones(this.playerID) > 0 && this.hovering != null) {
+			this.drawingLine = true;
+		}
+	}
+
+	connectStones(s1, s2) {
+		this.connections.push([s1, s2]);
+		this.stoneCanvas.drawLine(
+			s1.pos.x,
+			s1.pos.y,
+			s2.pos.x,
+			s2.pos.y,
+			this.playerColours[s1.playerID],
+			1
+		);
+	}
+
+	onmouseup() {
+		if (this.drawingLine && 
+			this.lineEnd != null && 
+			this.hovering != null && 
+			this.turn != null &&
+			this.isConnected(this.lineEnd, this.hovering)
+		) {
+			// Try and connect the two stones.
+			// If connected, and not a taken spot.
+			console.log("trying to connect");
+			this.placeStone(this.lineEnd.x, this.lineEnd.y, this.playerID);
+			this.connectStones(this.lineEnd, this.hovering);
+			this.socket.emit(
+				'move', 
+				{
+					id: this.id, 
+					connected: this.hovering,
+					playerID: this.playerID,
+					x: this.lineEnd.x, 
+					y: this.lineEnd.y
+				}
+			);
+			this.turn = null;
+			this.drawingLine = false;
+			this.lineEnd = null;
+			this.hovering = null;
 			this.selected = null;
 		}
 	}
 
-	onmousedown() {
-		
-	}
-
-	onmouseup() {
-
-	}
-
 	onmouseclick() {
-		if (this.selected != null) {
+		console.log(this.selected, this.drawingLine);
+		if (this.selected != null && !this.drawingLine) {
 			console.log("making a move!");
 			this.placeStone(this.selected.x, this.selected.y, this.playerID);
-			this.socket.emit('move', {id: this.id, playerID: this.playerID, x: this.selected.x, y: this.selected.y});
+			this.socket.emit('move', {id: this.id, connected: null, playerID: this.playerID, x: this.selected.x, y: this.selected.y});
 			this.turn = null;
 		}
 	}

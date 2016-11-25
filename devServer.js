@@ -28,6 +28,7 @@ var io = require('socket.io')(server);
 var players = {};
 var turn = 0;
 
+var connections = [];
 var grid = [];
 var resetGrid = function(gridWidth, gridHeight) {
 	for (var x = 0; x < gridWidth; x++) {
@@ -60,7 +61,7 @@ io.on('connection', function(socket){
 
 	console.log(players[0], players[1]);
 
-	socket.emit('login', {id, turn, player, grid, players});
+	socket.emit('login', {id, turn, player, grid, connections, players});
 	socket.broadcast.emit('create player', id);
 
 	socket.on('move', function(move){
@@ -73,7 +74,22 @@ io.on('connection', function(socket){
 				console.log(move.playerID, "moving at", x, y);
 				grid[x][y] = move.playerID;
 				turn = move.playerID == 0 ? 1 : 0;
-				socket.broadcast.emit('move', {x, y, playerID: move.playerID, turn});
+				if (move.connected != null) {
+					connections.push([
+						{x: move.connected.x, y: move.connected.y},
+						{x: move.x, y: move.y}
+					]);
+				}
+				socket.broadcast.emit(
+					'move', 
+					{
+						x, 
+						y, 
+						connected: move.connected, 
+						playerID: move.playerID,
+						turn
+					}
+				);
 			} else {
 				console.log("Square is taken.");
 				socket.emit('move_fail', {turn, x, y, msg: 'Square is taken'});
