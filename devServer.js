@@ -5,7 +5,6 @@ var webpack = require('webpack');
 var config = require('./webpack.config.js');
 var uid = require('uid');
 var _ = require('underscore');
-var Maths = require('./Game/Maths');
 
 var app = express();
 var compiler = webpack(config);
@@ -153,6 +152,6 @@ io.on('connection', function(socket){
 		console.log(players[0], players[1]);
 	});
 });
-server.listen(process.env.PORT || 3000, function() {
-	console.log("listening on port " + (process.env.PORT));
+server.listen(3000, function() {
+	console.log("listening on port " + 3000);
 });
