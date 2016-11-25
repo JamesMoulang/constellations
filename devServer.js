@@ -5,6 +5,7 @@ var webpack = require('webpack');
 var config = require('./webpack.config.js');
 var uid = require('uid');
 var _ = require('underscore');
+var Maths = require('./Game/Maths');
 
 var app = express();
 var compiler = webpack(config);
@@ -27,10 +28,14 @@ var io = require('socket.io')(server);
 
 var players = {};
 var turn = 0;
+var gridWidth = 0;
+var gridHeight = 0;
 
 var connections = [];
 var grid = [];
-var resetGrid = function(gridWidth, gridHeight) {
+var resetGrid = function(_gridWidth, _gridHeight) {
+	gridWidth = _gridWidth;
+	gridHeight = _gridHeight;
 	for (var x = 0; x < gridWidth; x++) {
 		grid.push([]);
 		for (var y = 0; y < gridHeight; y++) {
@@ -43,6 +48,27 @@ var resetGrid = function(gridWidth, gridHeight) {
 	}
 }
 resetGrid(19, 19);
+
+var forEachNode = function(callback) {
+	for (var x = 0; x < gridWidth; x++) {
+		for (var y = 0; y < gridHeight; y++) {
+			var node = grid[x][y];
+			if (typeof(node) !== 'undefined') {
+				callback(node, x, y);
+			}
+		}
+	}
+}
+
+var getTotalStones = function(playerID) {
+	var total = 0;
+	forEachNode(function(node, x, y) {
+		if (node.playerID == playerID) {
+			total++;
+		}
+	});
+	return total;
+}
 
 io.on('connection', function(socket){
 	var id = uid();
@@ -63,6 +89,27 @@ io.on('connection', function(socket){
 
 	socket.emit('login', {id, turn, player, grid, connections, players});
 	socket.broadcast.emit('create player', id);
+
+	socket.on('break', function(data) {
+		var broken = data.connections.map(function(c) {
+			return [
+				{x: c[0].x, y: c[0].y},
+				{x: c[1].x, y: c[1].y}
+			];
+		});
+		console.log(broken);
+		connections = _.difference(connections, broken);
+
+		forEachNode(function(node, x, y) {
+			if (getTotalStones(node.playerID) > 1) {
+				if (node.claimed && node.neighbours <= 0) {
+					node.claimed = false;
+					node.playerID = -1;
+					node.neighbours = 0;
+				}
+			}
+		});
+	});
 
 	socket.on('move', function(move){
 		var id = move.id;
@@ -106,6 +153,6 @@ io.on('connection', function(socket){
 		console.log(players[0], players[1]);
 	});
 });
-server.listen(3000, function() {
-	console.log("listening on port 3000");
+server.listen(process.env.PORT || 3000, function() {
+	console.log("listening on port " + (process.env.PORT));
 });

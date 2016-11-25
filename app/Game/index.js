@@ -237,6 +237,20 @@ class Game {
 		}
 	}
 
+	//p1, p2, p3, p4: node
+	intersects(p1, p2, p3, p4) {
+		console.log(p1.pos.minus(p2.pos) == p3.pos.minus(p4.pos));
+		if (p1.pos.minus(p2.pos) == p3.pos.minus(p4.pos) ||
+			p1.playerID == p3.playerID) {
+			return false;
+		} else {
+			return Maths.lineIntersect(
+				p1.x, p1.y, p2.x, p2.y,
+				p3.x, p3.y, p4.x, p4.y
+			);
+		}
+	}
+
 	isConnected(p1, p2) {
 		var x = Math.abs(p1.pos.x - p2.pos.x);
 		var y = Math.abs(p1.pos.y - p2.pos.y);
@@ -250,7 +264,11 @@ class Game {
 		}
 	}
 
+	//s1, s2: node
 	connectStones(s1, s2) {
+		console.log("connecting stones");
+		s1.neighbours++;
+		s2.neighbours++;
 		this.connections.push([s1, s2]);
 		this.stoneCanvas.drawLine(
 			s1.pos.x,
@@ -260,31 +278,69 @@ class Game {
 			this.playerColours[s1.playerID],
 			1
 		);
+
+		// this.connections: [[node, node], ...]
+		var broken = [];
+		_.each(this.connections, function(c) {
+			var p3 = c[0];
+			var p4 = c[1];
+			if (this.intersects(s1, s2, p3, p4)) {
+				broken.push(c);
+			}
+		}.bind(this));
+
+		if (broken.length > 0) {
+			_.each(broken, function(b) {
+				b[0].neighbours--;
+				b[1].neighbours--;
+				if (b[0].neighbours < 0) {
+					b[0].neighbours = 0;
+				}
+				if (b[1].neighbours < 0) {
+					b[1].neighbours = 0;
+				}
+			}.bind(this));
+			this.connections = _.difference(this.connections, broken);
+		}
+
+		//Check for islolated stones
+		this.forEachNode(function(node, x, y) {
+			if (this.getTotalStones(node.playerID) > 1) {
+				if (node.claimed && node.neighbours <= 0) {
+					node.claimed = false;
+					node.playerID = -1;
+					node.neighbours = 0;
+				}
+			}
+		}.bind(this));
+
+		this.redrawStones();
 	}
 
 	onmouseup() {
 		if (this.drawingLine && 
 			this.lineEnd != null && 
 			this.hovering != null && 
-			this.turn != null &&
-			this.isConnected(this.lineEnd, this.hovering)
+			this.turn != null
 		) {
-			// Try and connect the two stones.
-			// If connected, and not a taken spot.
-			console.log("trying to connect");
-			this.placeStone(this.lineEnd.x, this.lineEnd.y, this.playerID);
-			this.connectStones(this.lineEnd, this.hovering);
-			this.socket.emit(
-				'move', 
-				{
-					id: this.id, 
-					connected: this.hovering,
-					playerID: this.playerID,
-					x: this.lineEnd.x, 
-					y: this.lineEnd.y
-				}
-			);
-			this.turn = null;
+			if (this.isConnected(this.lineEnd, this.hovering)) {
+				// Try and connect the two stones.
+				// If connected, and not a taken spot.
+				console.log("trying to connect");
+				this.placeStone(this.lineEnd.x, this.lineEnd.y, this.playerID);
+				this.socket.emit(
+					'move', 
+					{
+						id: this.id, 
+						connected: this.hovering,
+						playerID: this.playerID,
+						x: this.lineEnd.x, 
+						y: this.lineEnd.y
+					}
+				);
+				this.connectStones(this.lineEnd, this.hovering);
+				this.turn = null;
+			}
 			this.drawingLine = false;
 			this.lineEnd = null;
 			this.hovering = null;
@@ -297,7 +353,16 @@ class Game {
 		if (this.selected != null && !this.drawingLine) {
 			console.log("making a move!");
 			this.placeStone(this.selected.x, this.selected.y, this.playerID);
-			this.socket.emit('move', {id: this.id, connected: null, playerID: this.playerID, x: this.selected.x, y: this.selected.y});
+			this.socket.emit(
+				'move', 
+				{
+					id: this.id, 
+					connected: null, 
+					playerID: this.playerID, 
+					x: this.selected.x, 
+					y: this.selected.y
+				}
+			);
 			this.turn = null;
 		}
 	}
@@ -357,23 +422,10 @@ class Game {
 				}
 			}
 		}
-
-		for (var i = 0; i < this.connections.length; i++) {
-			var c = this.connections[i];
-			var s1 = this.grid[c[0].x][c[0].y];
-			var s2 = this.grid[c[1].x][c[1].y];
-			this.stoneCanvas.drawLine(
-				s1.pos.x,
-				s1.pos.y,
-				s2.pos.x,
-				s2.pos.y,
-				this.playerColours[s1.playerID],
-				1
-			);
-		}
 	}
 
 	redrawStones() {
+		this.stoneCanvas.clear();
 		for (var x = 0; x < this.gridWidth; x++) {
 			for (var y = 0; y < this.gridHeight; y++) {
 				if (typeof(this.grid[x][y]) !== 'undefined' && this.grid[x][y].claimed) {
@@ -387,6 +439,20 @@ class Game {
 					);
 				}
 			}
+		}
+
+		for (var i = 0; i < this.connections.length; i++) {
+			var c = this.connections[i];
+			var s1 = this.grid[c[0].x][c[0].y];
+			var s2 = this.grid[c[1].x][c[1].y];
+			this.stoneCanvas.drawLine(
+				s1.pos.x,
+				s1.pos.y,
+				s2.pos.x,
+				s2.pos.y,
+				this.playerColours[s1.playerID],
+				1
+			);
 		}
 	}
 

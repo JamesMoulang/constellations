@@ -7,6 +7,7 @@ class Node {
 		this.pos = pos;
 		this.claimed = false;
 		this.playerID = -1;
+		this.neighbours = 0;
 	}
 
 	select(playerID) {
