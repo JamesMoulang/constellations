@@ -152,6 +152,7 @@ io.on('connection', function(socket){
 		console.log(players[0], players[1]);
 	});
 });
-server.listen(3000, function() {
-	console.log("listening on port " + 3000);
+var port = typeof(process.env.PORT) === 'undefined' ? 3000 : process.env.PORT;
+server.listen(port, function() {
+	console.log("listening on port " + port);
 });
