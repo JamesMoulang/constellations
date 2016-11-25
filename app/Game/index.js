@@ -357,6 +357,20 @@ class Game {
 				}
 			}
 		}
+
+		for (var i = 0; i < this.connections.length; i++) {
+			var c = this.connections[i];
+			var s1 = this.grid[c[0].x][c[0].y];
+			var s2 = this.grid[c[1].x][c[1].y];
+			this.stoneCanvas.drawLine(
+				s1.pos.x,
+				s1.pos.y,
+				s2.pos.x,
+				s2.pos.y,
+				this.playerColours[s1.playerID],
+				1
+			);
+		}
 	}
 
 	redrawStones() {
